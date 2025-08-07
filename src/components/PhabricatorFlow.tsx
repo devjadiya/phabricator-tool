@@ -131,7 +131,7 @@ const PhabricatorFlow = ({ issueId }: PhabricatorFlowProps) => {
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex flex-col  gap-8">
         {/* Left Column: Issue and Solution */}
         <div className=" w-full space-y-6">
           {!phabData ? (
@@ -139,13 +139,13 @@ const PhabricatorFlow = ({ issueId }: PhabricatorFlowProps) => {
           ) : (
             <PhabricatorIssueCard data={phabData} />
           )}
+        </div>
 
-          <div className=" w-full space-y-6">
-            {!relatedRepoData && geminiSolution && !error && (
-              <LoadingSpinner text={loadingState} />
-            )}
-            {relatedRepoData && <RepoSummaryCard repoData={relatedRepoData} />}
-          </div>
+        <div className=" w-full space-y-6">
+          {!relatedRepoData && geminiSolution && !error && (
+            <LoadingSpinner text={loadingState} />
+          )}
+          {relatedRepoData && <RepoSummaryCard repoData={relatedRepoData} />}
         </div>
 
         <div className="w-full">
