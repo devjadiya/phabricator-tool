@@ -106,7 +106,7 @@ const GitIngestClone = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-[#111828]">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-12">
@@ -219,7 +219,7 @@ const GitIngestClone = () => {
                 disabled={
                   loading || (!selectedTask && !query.trim().startsWith("T"))
                 }
-                className="bg-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 hover:shadow-lg"
+                className="bg-black hover:bg-gray-800  disabled:cursor-not-allowed text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 hover:shadow-lg"
               >
                 <div className="flex items-center justify-center gap-3">
                   {loading ? (

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Ensure you have GEMINI_API_KEY in your .env.local file
-const genAI = new GoogleGenerativeAI("AIzaSyCuoJXOUoL-bhXUuFPe7IBTTWoTDJVF1BA");
+const genAI = new GoogleGenerativeAI("AIzaSyC7ayV2AD8m3X8BEx_a2yQ5w1NM3fGBVGw");
 
 // --- NEW: Configuration for retry logic ---
 const MAX_RETRIES = 3;
