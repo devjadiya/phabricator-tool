@@ -54,11 +54,11 @@ const AnalysisPage = () => {
               <Code2 className="w-8 h-8 text-black" />
             </div>
             <h1 className="text-4xl md:text-6xl font-bold text-white">
-              ArchiWiki
+              DevCode
             </h1>
           </div>
           <p className="text-md text-gray-300 max-w-2xl mx-auto leading-relaxed">
-            ArchiWiki is a code architecture visualization tool designed for the
+            DevCode is a code architecture visualization tool designed for the
             MediaWiki ecosystem. It offers high- and low-level relational
             diagrams that demystify the core-extension structure, making it
             easier for new developers to contribute. ✨

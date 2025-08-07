@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Navigation from "@/components/Navigation";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Archiwiki",
+  title: "DevCode",
   description:
-    "ArchiWiki is a code architecture visualization tool designed for the MediaWiki ecosystem. It offers high- and low-level relational diagrams that demystify the core-extension structure, making it easier for new developers to contribute.",
+    "DevCode is a code architecture visualization tool designed for the MediaWiki ecosystem. It offers high- and low-level relational diagrams that demystify the core-extension structure, making it easier for new developers to contribute.",
 };
 
 export default function RootLayout({
@@ -28,6 +29,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Navigation />
         {children}
       </body>
     </html>

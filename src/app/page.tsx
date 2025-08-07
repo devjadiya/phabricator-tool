@@ -1,182 +1,109 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect, Fragment } from "react";
 import {
-  Search,
-  Github,
   Code2,
-  FileText,
-  Folder,
-  Star,
-  GitBranch,
-  Clock,
-  Users,
-  TrendingUp,
-  Download,
-  Copy,
-  Check,
   Sparkles,
-  Zap,
-  Eye,
-  AlertCircle,
+  ChevronsUpDown, // New icon for the combobox button
+  Check,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Combobox, Transition } from "@headlessui/react";
 
-interface RepoData {
-  repo_url: string;
-  short_repo_url: string;
-  summary: string;
-  digest_url: string;
-  tree: string;
-  content: string;
-  default_max_file_size: number;
-  pattern_type: string;
-  pattern: string;
+// Define the structure of a Phabricator task object
+interface PhabricatorTask {
+  id: number;
+  phid: string;
+  fields: {
+    name: string;
+    // You can add other fields you might need, like status, priority, etc.
+  };
+  // The task ID like "T12345"
+  key: string;
 }
 
-interface RepoStats {
-  files: number;
-  tokens: string;
-  structure: string[];
-  languages: string[];
+// A helper type for our state
+interface TaskSuggestion extends PhabricatorTask {
+  // We add 'key' to the root for easier access, since the API nests it
+  key: string;
 }
 
 const GitIngestClone = () => {
-  const [inputText, setInputText] = useState("");
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [repoData, setRepoData] = useState<RepoData | null>(null);
-  const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [maxFileSize, setMaxFileSize] = useState("50");
-  const [pattern, setPattern] = useState("");
-  const [patternType, setPatternType] = useState("exclude");
+  const [query, setQuery] = useState(""); // State for the user's search input
+  const [tasks, setTasks] = useState<TaskSuggestion[]>([]); // State for API suggestions
+  const [selectedTask, setSelectedTask] = useState<TaskSuggestion | null>(null);
 
-  const parseRepoStats = (data: RepoData): RepoStats => {
-    const summaryMatch = data.summary.match(/Files analyzed: (\d+)/);
-    const tokensMatch = data.summary.match(/Estimated tokens: ([\d.]+k?)/);
+  // --- API Configuration ---
+  const API_TOKEN = "api-nhvap27hnnb6igtgizlu76mcuro5";
+  const PHABRICATOR_URL =
+    "https://phabricator.wikimedia.org/api/maniphest.search";
 
-    const treeLines = data.tree.split("\n").filter((line) => line.trim());
-    const structure = treeLines.slice(1).map((line) =>
-      line
-        .trim()
-        .replace(/[└├─│]/g, "")
-        .trim()
-    );
-
-    const languages = [
-      ...new Set(
-        structure
-          .filter((file) => file.includes("."))
-          .map((file) => {
-            const ext = file.split(".").pop()?.toLowerCase();
-            switch (ext) {
-              case "js":
-              case "jsx":
-                return "JavaScript";
-              case "ts":
-              case "tsx":
-                return "TypeScript";
-              case "py":
-                return "Python";
-              case "html":
-                return "HTML";
-              case "css":
-                return "CSS";
-              case "java":
-                return "Java";
-              case "cpp":
-              case "cc":
-                return "C++";
-              case "c":
-                return "C";
-              case "php":
-                return "PHP";
-              case "rb":
-                return "Ruby";
-              case "go":
-                return "Go";
-              case "rs":
-                return "Rust";
-              default:
-                return ext?.toUpperCase() || "Unknown";
-            }
-          })
-          .filter(Boolean)
-      ),
-    ];
-
-    return {
-      files: parseInt(summaryMatch?.[1] || "0"),
-      tokens: tokensMatch?.[1] || "0",
-      structure,
-      languages,
-    };
-  };
-
-  const analyzeRepo = async () => {
-    if (!inputText.trim()) {
-      setError("Please enter a repository URL or username/repo");
+  // --- Debounced API Fetching ---
+  useEffect(() => {
+    // Don't search if the query is too short
+    if (query.length < 3) {
+      setTasks([]);
       return;
     }
 
-    setLoading(true);
-    setError("");
-    setRepoData(null);
+    // This function now calls our internal API route
+    const fetchTasks = async () => {
+      try {
+        // Call our own API endpoint, which acts as a proxy
+        const response = await fetch("/api/search", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          // Send the search query in the body
+          body: JSON.stringify({ query: query }),
+        });
 
-    try {
-      // Use Next.js API route as proxy to avoid CORS issues
-      const response = await fetch("/api/gitingest", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          input_text: inputText.trim(),
-          token: "",
-          max_file_size: maxFileSize,
-          pattern: pattern,
-          pattern_type: patternType,
-        }),
-      });
+        if (!response.ok) {
+          throw new Error(`API route failed with status: ${response.status}`);
+        }
 
-      if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
-        throw new Error(
-          errorData.error ||
-            `Failed to analyze repository: ${response.statusText}`
+        const result = await response.json();
+
+        if (result.error_info || result.error) {
+          throw new Error(result.error_info || result.error);
+        }
+
+        // The data structure from the API is nested under result.data
+        const formattedTasks = result.result.data.map(
+          (task: PhabricatorTask) => ({
+            ...task,
+            key: `T${task.id}`, // Add the "T" prefix for display and navigation
+          })
         );
+
+        setTasks(formattedTasks);
+      } catch (error) {
+        console.error("Failed to fetch Phabricator tasks:", error);
+        setTasks([]); // Clear tasks on error
       }
+    };
+    // Debounce the API call to avoid firing on every keystroke
+    const debounceTimeout = setTimeout(() => {
+      fetchTasks();
+    }, 5); // Wait 500ms after the user stops typing
 
-      const data: RepoData = await response.json();
-      setRepoData(data);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "An error occurred while analyzing the repository"
-      );
-    } finally {
-      setLoading(false);
+    // Cleanup function to cancel the timeout if the user types again
+    return () => clearTimeout(debounceTimeout);
+  }, [query]); // This effect runs whenever the 'query' state changes
+
+  const redirect = () => {
+    if (!selectedTask) {
+      // If no task is selected, try to use the query if it looks like a task ID
+      if (query.trim().startsWith("T")) {
+        router.push(`/${query.trim()}`);
+      }
+      return;
     }
+    // Redirect using the selected task's key
+    router.push(`/${selectedTask.key}`);
   };
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  };
-
-  const downloadDigest = () => {
-    if (repoData?.digest_url) {
-      window.open(repoData.digest_url, "_blank");
-    }
-  };
-
-  const stats = repoData ? parseRepoStats(repoData) : null;
 
   return (
     <div className="min-h-screen bg-black">
@@ -188,11 +115,11 @@ const GitIngestClone = () => {
               <Code2 className="w-8 h-8 text-black" />
             </div>
             <h1 className="text-4xl md:text-6xl font-bold text-white">
-              ArchiWiki
+              DevCode
             </h1>
           </div>
           <p className="text-md text-gray-300 max-w-2xl mx-auto leading-relaxed">
-            ArchiWiki is a code architecture visualization tool designed for the
+            DevCode is a code architecture visualization tool designed for the
             MediaWiki ecosystem. It offers high- and low-level relational
             diagrams that demystify the core-extension structure, making it
             easier for new developers to contribute. ✨
@@ -203,74 +130,106 @@ const GitIngestClone = () => {
         <div className="max-w-4xl mx-auto mb-12">
           <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 shadow-lg">
             <div className="flex flex-col gap-6">
-              {/* Primary Input */}
-              <div className="relative">
-                <Github className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
-                <input
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Enter repository URL or username/repository (e.g., facebook/react)"
-                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-300 rounded-xl text-black placeholder-gray-500 focus:border-black focus:bg-white transition-all"
-                  onKeyPress={(e) => e.key === "Enter" && analyzeRepo()}
-                />
-              </div>
-
-              {/* Advanced Options */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Max File Size (MB)
-                  </label>
-                  <input
-                    type="number"
-                    value={maxFileSize}
-                    onChange={(e) => setMaxFileSize(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border-2 border-gray-300 rounded-lg text-black focus:border-black transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Pattern Type
-                  </label>
-                  <select
-                    value={patternType}
-                    onChange={(e) => setPatternType(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border-2 border-gray-300 rounded-lg text-black focus:border-black transition-colors"
+              {/* --- New Combobox Input --- */}
+              <Combobox value={selectedTask} onChange={setSelectedTask}>
+                <div className="relative">
+                  <div className="relative w-full cursor-default overflow-hidden rounded-xl bg-gray-50 text-left border-2 border-gray-300 focus-within:border-black focus-within:ring-1 focus-within:ring-black">
+                    <img
+                      src={"/logo.png"}
+                      className="pointer-events-none absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500"
+                      alt="Logo"
+                    />
+                    <Combobox.Input
+                      className="w-full border-none py-4 pl-12 pr-10 text-md leading-5 text-black bg-gray-50 placeholder-gray-500 focus:ring-0"
+                      displayValue={(task: TaskSuggestion | null) =>
+                        task ? `${task.key}: ${task.fields.name}` : query
+                      }
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Search Phabricator's task id or title..."
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          redirect();
+                        }
+                      }}
+                    />
+                    <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
+                      <ChevronsUpDown
+                        className="h-5 w-5 text-gray-400"
+                        aria-hidden="true"
+                      />
+                    </Combobox.Button>
+                  </div>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                    afterLeave={() => setQuery("")}
                   >
-                    <option value="exclude">Exclude</option>
-                    <option value="include">Include</option>
-                  </select>
+                    <Combobox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm z-10">
+                      {tasks.length === 0 && query !== "" ? (
+                        <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
+                          Nothing found.
+                        </div>
+                      ) : (
+                        tasks.map((task) => (
+                          <Combobox.Option
+                            key={task.phid}
+                            className={({ active }) =>
+                              `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                active ? "bg-black text-white" : "text-gray-900"
+                              }`
+                            }
+                            value={task}
+                          >
+                            {({ selected, active }) => (
+                              <>
+                                <span
+                                  className={`block truncate ${
+                                    selected ? "font-medium" : "font-normal"
+                                  }`}
+                                >
+                                  {task.key}: {task.fields.name}
+                                </span>
+                                {selected ? (
+                                  <span
+                                    className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
+                                      active ? "text-white" : "text-black"
+                                    }`}
+                                  >
+                                    <Check
+                                      className="h-5 w-5"
+                                      aria-hidden="true"
+                                    />
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
+                          </Combobox.Option>
+                        ))
+                      )}
+                    </Combobox.Options>
+                  </Transition>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Pattern
-                  </label>
-                  <input
-                    type="text"
-                    value={pattern}
-                    onChange={(e) => setPattern(e.target.value)}
-                    placeholder="*.test.js, node_modules"
-                    className="w-full px-3 py-2 bg-gray-50 border-2 border-gray-300 rounded-lg text-black placeholder-gray-500 focus:border-black transition-colors"
-                  />
-                </div>
-              </div>
+              </Combobox>
 
               {/* Action Button */}
               <button
-                onClick={analyzeRepo}
-                disabled={loading}
+                onClick={redirect}
+                disabled={
+                  loading || (!selectedTask && !query.trim().startsWith("T"))
+                }
                 className="bg-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 hover:shadow-lg"
               >
                 <div className="flex items-center justify-center gap-3">
                   {loading ? (
                     <>
                       <div className="w-5 h-5 border-2 border-gray-300 border-t-white rounded-full animate-spin"></div>
-                      Analyzing Repository...
+                      Analyzing Issue...
                     </>
                   ) : (
                     <>
-                      Analyze Repository
+                      Analyze
                       <Sparkles className="w-4 h-4 text-yellow-400" />
                     </>
                   )}
@@ -279,162 +238,12 @@ const GitIngestClone = () => {
             </div>
           </div>
         </div>
-
-        {/* Error Display */}
-        {error && (
-          <div className="max-w-4xl mx-auto mb-8">
-            <div className="bg-red-500 border-2 border-red-600 rounded-xl p-4 text-white">
-              <p className="font-medium">❌ {error}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Results Section */}
-        {repoData && stats && (
-          <div className="max-w-6xl mx-auto space-y-8">
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white border-2 border-gray-200 rounded-xl p-6 text-center shadow-lg">
-                <FileText className="w-8 h-8 text-black mx-auto mb-2" />
-                <div className="text-2xl font-bold text-black">
-                  {stats.files}
-                </div>
-                <div className="text-gray-600 text-sm">Files Analyzed</div>
-              </div>
-              <div className="bg-black border-2 border-gray-800 rounded-xl p-6 text-center shadow-lg">
-                <TrendingUp className="w-8 h-8 text-white mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">
-                  {stats.tokens}
-                </div>
-                <div className="text-gray-300 text-sm">Estimated Tokens</div>
-              </div>
-              <div className="bg-green-500 border-2 border-green-600 rounded-xl p-6 text-center shadow-lg">
-                <Code2 className="w-8 h-8 text-white mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">
-                  {stats.languages.length}
-                </div>
-                <div className="text-green-100 text-sm">Languages</div>
-              </div>
-              <div className="bg-yellow-400 border-2 border-yellow-500 rounded-xl p-6 text-center shadow-lg">
-                <Folder className="w-8 h-8 text-black mx-auto mb-2" />
-                <div className="text-2xl font-bold text-black">
-                  {stats.structure.length}
-                </div>
-                <div className="text-yellow-800 text-sm">Structure Items</div>
-              </div>
-            </div>
-
-            {/* Repository Info */}
-            <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 shadow-lg">
-              <div className="flex items-center md:flex-row flex-col justify-between mb-6 gap-6">
-                <h2 className="text-2xl font-bold text-black flex items-center gap-3">
-                  <Github className="w-6 h-6 text-gray-700" />
-                  Repository Analysis
-                </h2>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => copyToClipboard(repoData.content)}
-                    className="flex items-center gap-2 px-4 py-2 bg-black hover:bg-gray-800 text-white rounded-lg transition-colors"
-                  >
-                    {copied ? (
-                      <Check className="w-4 h-4" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
-                    {copied ? "Copied!" : "Copy"}
-                  </button>
-                  <button
-                    onClick={downloadDigest}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-8">
-                {/* Repository Details */}
-                <div>
-                  <h3 className="text-lg font-semibold text-black mb-4 flex items-center gap-2">
-                    <Eye className="w-5 h-5 text-gray-700" />
-                    Repository Details
-                  </h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <GitBranch className="w-4 h-4 text-gray-500" />
-                      <span className="text-gray-700">URL:</span>
-                      <a
-                        href={repoData.repo_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-black hover:text-gray-700 transition-colors break-all font-medium"
-                      >
-                        {repoData.short_repo_url}
-                      </a>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <FileText className="w-4 h-4 text-gray-500 mt-1" />
-                      <div>
-                        <span className="text-gray-700">Summary:</span>
-                        <p className="text-gray-600 mt-1 text-sm">
-                          {repoData.summary}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Languages Used */}
-                <div>
-                  <h3 className="text-lg font-semibold text-black mb-4 flex items-center gap-2">
-                    <Code2 className="w-5 h-5 text-gray-700" />
-                    Languages Detected
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {stats.languages.map((lang, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-black text-white border-2 border-gray-800 rounded-full text-sm font-medium"
-                      >
-                        {lang}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* File Structure */}
-            <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 shadow-lg">
-              <h3 className="text-xl font-bold text-black mb-6 flex items-center gap-3">
-                <Folder className="w-6 h-6 text-gray-700" />
-                Directory Structure
-              </h3>
-              <div className="bg-black border-2 border-gray-800 rounded-xl p-6 font-mono text-sm overflow-x-auto">
-                <pre className="text-green-400 whitespace-pre-wrap">
-                  {repoData.tree}
-                </pre>
-              </div>
-            </div>
-
-            {/* Content Preview */}
-            <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 shadow-lg">
-              <h3 className="text-xl font-bold text-black mb-6 flex items-center gap-3">
-                <FileText className="w-6 h-6 text-gray-700" />
-                Content Preview
-              </h3>
-              <div className="bg-black border-2 border-gray-800 rounded-xl p-6 max-h-96 overflow-y-auto">
-                <pre className="text-gray-300 text-sm whitespace-pre-wrap font-mono">
-                  {repoData.content}
-                </pre>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
 };
 
 export default GitIngestClone;
+
+// The API token is now used inside the component, so this line is no longer needed here.
+// const API_TOKEN = process.env.PHABRICATOR_API_TOKEN || "api-nhvap27hnnb6igtgizlu76mcuro5";

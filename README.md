@@ -1,8 +1,8 @@
-# ArchiWiki Project Working Document
+# DevCode Project Working Document
 
 ## Overview
 
-**ArchiWiki** is a code architecture visualization tool designed for the MediaWiki ecosystem. It analyzes GitHub repositories or Phabricator issues, summarizes their structure, and provides insights such as file counts, language breakdowns, and directory trees.
+**DevCode** is a code architecture visualization tool designed for the MediaWiki ecosystem. It analyzes GitHub repositories or Phabricator issues, summarizes their structure, and provides insights such as file counts, language breakdowns, and directory trees.
 
 ---
 
@@ -23,9 +23,10 @@
 
 ### Internal (Next.js API Routes)
 
-- **`/api/gitingest`**  
-  - **POST**  
-  - **Body**:  
+- **`/api/gitingest`**
+
+  - **POST**
+  - **Body**:
     ```json
     {
       "input_text": "<GitHub repo URL or username/repo>",
@@ -35,25 +36,26 @@
       "pattern_type": "exclude|include"
     }
     ```
-  - **Returns**:  
+  - **Returns**:
     - Repository summary, directory tree, content preview, etc.
 
-- **`/api/phabissue`**  
-  - **POST**  
-  - **Body**:  
+- **`/api/phabissue`**
+
+  - **POST**
+  - **Body**:
     ```json
     { "taskId": "T<id>" }
     ```
-  - **Returns**:  
+  - **Returns**:
     - Phabricator issue details, comments, and user info.
 
-- **`/api/gemini`**  
-  - **POST**  
-  - **Body**:  
+- **`/api/gemini`**
+  - **POST**
+  - **Body**:
     ```json
     { "prompt": "<AI prompt>" }
     ```
-  - **Returns**:  
+  - **Returns**:
     - AI-generated solution for a Phabricator issue.
 
 ---
@@ -90,17 +92,20 @@ package.json
 ## Use Cases
 
 1. **Analyze a GitHub Repository**
+
    - User enters a GitHub repo URL or `username/repo`.
    - System fetches repo, analyzes structure, summarizes files, languages, and tokens.
    - Displays directory tree, summary, and content preview.
 
 2. **Analyze a Phabricator Issue**
+
    - User navigates to `/T<id>` route.
    - System fetches issue details and comments from Phabricator.
    - AI generates a solution plan and identifies the most relevant GitHub repo.
    - That repo is then analyzed as above.
 
 3. **Pattern-based Filtering**
+
    - User can include/exclude files by pattern (e.g., only `.js` files).
 
 4. **Token/Size Limiting**
@@ -151,7 +156,7 @@ package.json
 
 ## Development
 
-- Start dev server:  
+- Start dev server:
   ```bash
   npm run dev
   ```
