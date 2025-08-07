@@ -180,3 +180,34 @@ package.json
 
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Learn Next.js](https://nextjs.org/learn)
+
+## ArchiWiki provides several benefits that make it especially valuable for new technical contributors and the broader developer community:
+
+## Lowering Onboarding Barriers:
+
+New contributors can quickly understand a repository’s structure, main components, and coding languages without manually browsing files.
+Summaries and directory trees help users grasp project architecture at a glance.
+## Pattern-based Filtering:
+
+Contributors can focus on relevant files (e.g., only backend or frontend code) using include/exclude patterns, reducing cognitive overload.
+## Token and Size Limiting:
+
+Prevents information overload by skipping large or irrelevant files, making analysis manageable for newcomers.
+## Phabricator Issue Integration:
+
+Connects issues directly to code, helping contributors see where to start and what parts of the codebase are affected by a task.
+## AI-generated Solution Plans:
+
+Gemini AI provides actionable solution outlines for issues, guiding new contributors on how to approach a problem.
+## Consistent, Friendly UI:
+
+Visual summaries, cards, and markdown rendering make technical information more accessible and less intimidating.
+## Error Handling and Feedback:
+
+Clear error messages and warnings help users understand what went wrong and how to fix it, reducing frustration.
+## Open Source and Extensible:
+
+The project structure and API-first design make it easy for others to extend or adapt ArchiWiki for their own workflows.
+Documentation and References:
+
+Built-in references and links to documentation help users learn more about the tools and platforms involved.
