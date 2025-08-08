@@ -1,9 +1,9 @@
 "use client";
-import { Contact } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
 
-// Define the props for our component
+// --- Data and Type Definitions ---
+
 interface Language {
   code: string;
   name: string;
@@ -17,78 +17,97 @@ const languages: Language[] = [
   { code: "ar", name: "Arabic", country_code: "sa" },
   { code: "es", name: "Spanish", country_code: "es" },
   { code: "sw", name: "Swahili", country_code: "ke" },
+  { code: "id", name: "Indonesian", country_code: "id" },
 ];
 
-// This is a helper function to get the Google Translate cookie
-const getGoogleTranslateCookie = (): string | null => {
-  const cookies = document.cookie.split(";").map((c) => c.trim());
-  const cookie = cookies.find((c) => c.startsWith("googtrans="));
-  return cookie || null;
+const includedLanguages = languages.map(l => l.code).join(',');
+
+// --- Helper Function ---
+
+/**
+ * Reads the 'googtrans' cookie and determines the initial language.
+ * This runs before the component renders to prevent UI flicker.
+ * @returns {Language} The language object corresponding to the cookie, or English by default.
+ */
+const getLanguageFromCookie = (): Language => {
+  // On the server, document is not available. Default to English.
+  if (typeof document === 'undefined') {
+    return languages[0];
+  }
+
+  const cookieString = document.cookie;
+  const googleTranslateCookie = cookieString
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith("googtrans="));
+
+  if (googleTranslateCookie) {
+    const langCode = googleTranslateCookie.split("/")[2];
+    const lang = languages.find((l) => l.code === langCode);
+    return lang || languages[0];
+  }
+
+  return languages[0];
 };
 
+
+// --- The Navigation Component ---
+
 const Navigation: React.FC = () => {
-  const [selectedLanguage, setSelectedLanguage] = useState<Language>(
-    languages[0]
-  );
+  // Initialize state directly from the cookie to ensure it's correct on page load.
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>(getLanguageFromCookie);
   const [isDropdownOpen, setDropdownOpen] = useState<boolean>(false);
 
-  // This effect runs once to add the Google Translate script to the page
+  // This effect runs once on mount to inject the Google Translate script.
   useEffect(() => {
-    const addGoogleTranslateScript = () => {
-      const scriptId = "google-translate-script";
-      if (document.getElementById(scriptId)) return; // Script already exists
+    const scriptId = "google-translate-script";
 
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.type = "text/javascript";
-      script.src =
-        "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-      document.body.appendChild(script);
-    };
+    // If the script is already here, don't add it again.
+    if (document.getElementById(scriptId)) {
+        return;
+    }
 
-    // Define the callback function that Google Translate will call
+    // Define the global callback function that Google's script will call
     (window as any).googleTranslateElementInit = () => {
       new (window as any).google.translate.TranslateElement(
         {
-          pageLanguage: "en",
+          pageLanguage: "en", // The original language of your site
           autoDisplay: false,
-          includedLanguages: "en,hi,fr,ar,es,sw",
+          includedLanguages: includedLanguages,
         },
-        "google_translate_element"
+        "google_translate_element" // The ID of the div to render the widget in
       );
-      // Restore language selection if a cookie exists
-      const cookie = getGoogleTranslateCookie();
-      if (cookie) {
-        const langCode = cookie.split("/")[2];
-        const lang = languages.find((l) => l.code === langCode);
-        if (lang) {
-          setSelectedLanguage(lang);
-        }
-      }
     };
+    
+    // Create and append the script to the body
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.type = "text/javascript";
+    script.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    document.body.appendChild(script);
 
-    addGoogleTranslateScript();
   }, []);
 
-  // Function to change the language
+  /**
+   * Changes the language by updating the 'googtrans' cookie and reloading the page.
+   * @param {Language} lang - The new language to switch to.
+   */
   const changeLanguage = (lang: Language) => {
-    setSelectedLanguage(lang);
     setDropdownOpen(false);
-
-    const currentCookie = getGoogleTranslateCookie();
-    const newCookieValue = `/en/${lang.code}`;
-
-    // We set the cookie for Google Translate to use
-    if (!currentCookie || !currentCookie.includes(newCookieValue)) {
-      document.cookie = `googtrans=${newCookieValue}; path=/`;
-      // We reload the page to apply the translation
+    
+    // Only update cookie and reload if the language is actually different.
+    if (selectedLanguage.code !== lang.code) {
+      document.cookie = `googtrans=/en/${lang.code}; path=/; SameSite=Lax`;
       window.location.reload();
     }
   };
 
   return (
     <>
-      {/* CSS to hide the Google Translate bar */}
+      {/* This div is required by Google Translate, but we can hide it */}
+      <div id="google_translate_element" style={{ display: "none" }}></div>
+
+      {/* CSS to hide the default Google Translate banner that appears at the top */}
       <style>
         {`
           .goog-te-banner-frame.skiptranslate {
@@ -97,8 +116,18 @@ const Navigation: React.FC = () => {
           body {
             top: 0px !important;
           }
+          .skiptranslate {
+            display: none !important;
+          }
         `}
       </style>
+
+      {/* Add the flag-icons CSS for the flags to show up */}
+      <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css"
+      />
+
       <div className="bg-gray-900 text-white font-sans">
         <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -136,7 +165,7 @@ const Navigation: React.FC = () => {
                 </svg>
               </button>
               {isDropdownOpen && (
-                <div className="absolute    top-14 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-50">
+                <div className="absolute top-14 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-50">
                   {languages.map((lang) => (
                     <a
                       key={lang.code}
@@ -155,18 +184,12 @@ const Navigation: React.FC = () => {
                   ))}
                 </div>
               )}
-              <Link href={"/contact"} className=" text-white">
+              <Link href={"/contact"} className="text-white">
                 Maintainer
               </Link>
             </div>
           </div>
         </nav>
-
-        {/* You need to add flag-icons css for the flags to show up */}
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@6.6.6/css/flag-icons.min.css"
-        />
       </div>
     </>
   );
